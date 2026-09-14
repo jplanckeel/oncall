@@ -8,7 +8,7 @@ import { observer } from 'mobx-react';
 import { getLabelBackgroundTextColorObject } from 'styles/utils.styles';
 
 import { EscalationPolicy, EscalationPolicyProps } from 'components/Policy/EscalationPolicy';
-import { SortableList } from 'components/SortableList/SortableList';
+import { SortableItem, SortableList } from 'components/SortableList/SortableList';
 import { Timeline } from 'components/Timeline/Timeline';
 import { WithPermissionControlTooltip } from 'containers/WithPermissionControl/WithPermissionControlTooltip';
 import { EscalationChain } from 'models/escalation_chain/escalation_chain.types';
@@ -71,7 +71,7 @@ export const EscalationChainSteps = observer((props: EscalationChainStepsProps) 
   const { bgColor: successBgColor, textColor: successTextColor } = getLabelBackgroundTextColorObject('green', theme);
 
   return (
-    <SortableList useDragHandle axis="y" lockAxis="y" onSortEnd={handleSortEnd}>
+    <SortableList items={escalationPolicyIds || []} onSortEnd={handleSortEnd}>
       {addonBefore}
       {escalationPolicyIds ? (
         escalationPolicyIds.map((escalationPolicyId, index) => {
@@ -93,18 +93,18 @@ export const EscalationChainSteps = observer((props: EscalationChainStepsProps) 
           }
 
           return (
-            <EscalationPolicy
-              index={index} // This in here is a MUST for the SortableElement
-              key={`item-${escalationPolicy.id}`}
-              data={escalationPolicy}
-              number={index + offset + 1}
-              escalationChoices={escalationPolicyStore.webEscalationChoices}
-              onChange={escalationPolicyStore.saveEscalationPolicy.bind(escalationPolicyStore)}
-              onDelete={escalationPolicyStore.deleteEscalationPolicy.bind(escalationPolicyStore)}
-              isSlackInstalled={isSlackInstalled}
-              isDisabled={isDisabled}
-              {...extraProps}
-            />
+            <SortableItem key={`item-${escalationPolicy.id}`} id={escalationPolicyId} disabled={isDisabled}>
+              <EscalationPolicy
+                data={escalationPolicy}
+                number={index + offset + 1}
+                escalationChoices={escalationPolicyStore.webEscalationChoices}
+                onChange={escalationPolicyStore.saveEscalationPolicy.bind(escalationPolicyStore)}
+                onDelete={escalationPolicyStore.deleteEscalationPolicy.bind(escalationPolicyStore)}
+                isSlackInstalled={isSlackInstalled}
+                isDisabled={isDisabled}
+                {...extraProps}
+              />
+            </SortableItem>
           );
         })
       ) : (

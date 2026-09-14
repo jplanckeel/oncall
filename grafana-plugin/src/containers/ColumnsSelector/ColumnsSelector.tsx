@@ -22,6 +22,7 @@ import { Button, Checkbox, Icon, IconButton, LoadingPlaceholder, Tooltip, useSty
 import { UserActions } from 'helpers/authorization/authorization';
 import { openErrorNotification } from 'helpers/helpers';
 import { useIsLoading } from 'helpers/hooks';
+import { mergeRefs, useNodeRefRegistry } from 'helpers/nodeRefs';
 import { observer } from 'mobx-react';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
 
@@ -41,13 +42,15 @@ interface ColumnRowProps {
   column: AlertGroupColumn;
   onItemChange: (column: AlertGroupColumn) => void;
   onColumnRemoval: (column: AlertGroupColumn) => void;
+  /** react-transition-group `nodeRef`, merged with dnd-kit's own `setNodeRef` on the root element */
+  forwardedRef?: React.Ref<HTMLDivElement>;
 }
 
 function getColumnCombinedID(column: AlertGroupColumn) {
   return `${column.id}${KEY_DELIMITATOR}${column.type}`;
 }
 
-const ColumnRow: React.FC<ColumnRowProps> = ({ column, onItemChange, onColumnRemoval }) => {
+const ColumnRow: React.FC<ColumnRowProps> = ({ column, onItemChange, onColumnRemoval, forwardedRef }) => {
   const dnd = useSortable({
     id: getColumnCombinedID(column),
     data: {
@@ -66,7 +69,7 @@ const ColumnRow: React.FC<ColumnRowProps> = ({ column, onItemChange, onColumnRem
   };
 
   return (
-    <div ref={setNodeRef} style={{ ...style }} className={styles.columnRow}>
+    <div ref={mergeRefs<HTMLDivElement>(setNodeRef, forwardedRef)} style={{ ...style }} className={styles.columnRow}>
       <div className={styles.columnItem} ref={columnElRef}>
         <span className={styles.columnName}>{column.name}</span>
 
@@ -120,6 +123,8 @@ export const ColumnsSelector: React.FC<ColumnsSelectorProps> = observer(
     const isResetLoading = useIsLoading(ActionKey.RESET_COLUMNS_FROM_ALERT_GROUP);
 
     const styles = useStyles2(getColumnsSelectorStyles);
+    // react-transition-group needs an explicit nodeRef under React 19, one per <CSSTransition> key
+    const nodeRefs = useNodeRefRegistry();
 
     const { columns, isDefaultColumnOrder } = alertGroupStore;
 
@@ -156,14 +161,16 @@ export const ColumnsSelector: React.FC<ColumnsSelectorProps> = observer(
             <SortableContext items={mapColumnsToDndItems(visibleColumns)} strategy={verticalListSortingStrategy}>
               <TransitionGroup>
                 {visibleColumns.map((column) => (
-                  <CSSTransition
+                  <CSSTransition<HTMLDivElement>
                     key={getColumnCombinedID(column)}
+                    nodeRef={nodeRefs.get<HTMLDivElement>(`visible-${getColumnCombinedID(column)}`)}
                     timeout={TRANSITION_MS}
                     unmountOnExit
                     classNames="fade"
                   >
                     <ColumnRow
                       key={getColumnCombinedID(column)}
+                      forwardedRef={nodeRefs.get<HTMLDivElement>(`visible-${getColumnCombinedID(column)}`)}
                       column={column}
                       onItemChange={onItemChange}
                       onColumnRemoval={onConfirmRemovalModalOpen}
@@ -189,9 +196,15 @@ export const ColumnsSelector: React.FC<ColumnsSelectorProps> = observer(
             <SortableContext items={mapColumnsToDndItems(hiddenColumns)} strategy={verticalListSortingStrategy}>
               <TransitionGroup>
                 {hiddenColumns.map((column) => (
-                  <CSSTransition key={getColumnCombinedID(column)} timeout={TRANSITION_MS} classNames="fade">
+                  <CSSTransition<HTMLDivElement>
+                    key={getColumnCombinedID(column)}
+                    nodeRef={nodeRefs.get<HTMLDivElement>(`hidden-${getColumnCombinedID(column)}`)}
+                    timeout={TRANSITION_MS}
+                    classNames="fade"
+                  >
                     <ColumnRow
                       key={getColumnCombinedID(column)}
+                      forwardedRef={nodeRefs.get<HTMLDivElement>(`hidden-${getColumnCombinedID(column)}`)}
                       column={column}
                       onItemChange={onItemChange}
                       onColumnRemoval={onConfirmRemovalModalOpen}

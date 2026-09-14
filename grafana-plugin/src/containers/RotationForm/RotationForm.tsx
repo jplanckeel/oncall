@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { cx } from '@emotion/css';
 import {
@@ -17,6 +17,7 @@ import {
 import dayjs from 'dayjs';
 import { GRAFANA_HEADER_HEIGHT, StackSize } from 'helpers/consts';
 import { useDebouncedCallback, useIsLoading, useResize } from 'helpers/hooks';
+import { mergeRefs } from 'helpers/nodeRefs';
 import { observer } from 'mobx-react';
 import Draggable, { DraggableData, DraggableEvent } from 'react-draggable';
 
@@ -127,6 +128,8 @@ export const RotationForm = observer((props: RotationFormProps) => {
   const [rotationName, setRotationName] = useState(`[L${layerPriority}] Rotation`);
   const [isOpen, setIsOpen] = useState(false);
   const [offsetTop, setOffsetTop] = useState(GRAFANA_HEADER_HEIGHT + 10);
+  // react-draggable falls back on ReactDOM.findDOMNode without nodeRef, and React 19 removed it
+  const draggableRef = useRef<HTMLDivElement>(null);
   const [draggablePosition, setDraggablePosition] = useState<{ x: number; y: number }>(undefined);
 
   const [shiftStart, setShiftStart] = useState<dayjs.Dayjs>(
@@ -542,6 +545,7 @@ export const RotationForm = observer((props: RotationFormProps) => {
         onDismiss={onHide}
         contentElement={(props, children) => (
           <Draggable
+            nodeRef={draggableRef}
             handle=".drag-handler"
             defaultClassName={'draggable'}
             positionOffset={{ x: 0, y: offsetTop }}
@@ -550,7 +554,9 @@ export const RotationForm = observer((props: RotationFormProps) => {
             onStart={onDraggableInit}
             onStop={(_e, data) => setDraggablePosition({ x: data.x, y: data.y })}
           >
-            <div {...props}>{children}</div>
+            <div {...props} ref={mergeRefs<HTMLDivElement>(draggableRef, props.ref)}>
+              {children}
+            </div>
           </Draggable>
         )}
       >

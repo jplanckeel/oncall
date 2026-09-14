@@ -5,6 +5,7 @@ import { GrafanaTheme2 } from '@grafana/data';
 import { Stack, useStyles2, withTheme2 } from '@grafana/ui';
 import dayjs from 'dayjs';
 import { HTML_ID } from 'helpers/DOM';
+import { useNodeRefRegistry } from 'helpers/nodeRefs';
 import { observer } from 'mobx-react';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
 import { bem } from 'styles/utils.styles';
@@ -60,6 +61,8 @@ const _ScheduleFinal: FC<ScheduleFinalProps> = observer(
     } = store;
 
     const styles = useStyles2(getRotationsStyles);
+    // react-transition-group needs an explicit nodeRef under React 19, one per <CSSTransition> key
+    const nodeRefs = useNodeRefRegistry();
 
     const scheduleView = propsScheduleView || storeScheduleView;
 
@@ -105,9 +108,9 @@ const _ScheduleFinal: FC<ScheduleFinalProps> = observer(
             position: relative;
           `}
         >
-          {rows.map(({ startDate }, index) => (
+          {rows.map(({ startDate }, rowIndex) => (
             <TransitionGroup
-              key={index}
+              key={rowIndex}
               className={cx(
                 css`
                   position: relative;
@@ -119,7 +122,7 @@ const _ScheduleFinal: FC<ScheduleFinalProps> = observer(
               <TimelineMarks
                 scheduleView={scheduleView}
                 startDate={startDate}
-                withBorderBottom={index !== rows.length - 1}
+                withBorderBottom={rowIndex !== rows.length - 1}
               />
               <div
                 className={styles.currentTime}
@@ -136,12 +139,14 @@ const _ScheduleFinal: FC<ScheduleFinalProps> = observer(
               {shifts?.length ? (
                 shifts.map(({ events }, index) => {
                   return (
-                    <CSSTransition
+                    <CSSTransition<HTMLDivElement>
                       key={index}
+                      nodeRef={nodeRefs.get<HTMLDivElement>(`shift-${rowIndex}-${index}`)}
                       timeout={DEFAULT_TRANSITION_TIMEOUT}
                       classNames={{ ...getAnimationClasses() }}
                     >
                       <Rotation
+                        forwardedRef={nodeRefs.get<HTMLDivElement>(`shift-${rowIndex}-${index}`)}
                         scheduleView={scheduleView}
                         startDate={startDate}
                         key={index}
@@ -158,8 +163,18 @@ const _ScheduleFinal: FC<ScheduleFinalProps> = observer(
                   );
                 })
               ) : (
-                <CSSTransition key={0} timeout={DEFAULT_TRANSITION_TIMEOUT} classNames={{ ...getAnimationClasses() }}>
-                  <Rotation scheduleView={scheduleView} startDate={calendarStartDate} events={[]} />
+                <CSSTransition<HTMLDivElement>
+                  key={0}
+                  nodeRef={nodeRefs.get<HTMLDivElement>(`shift-empty-${rowIndex}`)}
+                  timeout={DEFAULT_TRANSITION_TIMEOUT}
+                  classNames={{ ...getAnimationClasses() }}
+                >
+                  <Rotation
+                    forwardedRef={nodeRefs.get<HTMLDivElement>(`shift-empty-${rowIndex}`)}
+                    scheduleView={scheduleView}
+                    startDate={calendarStartDate}
+                    events={[]}
+                  />
                 </CSSTransition>
               )}
             </TransitionGroup>

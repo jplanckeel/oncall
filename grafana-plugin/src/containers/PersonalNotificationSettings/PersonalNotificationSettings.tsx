@@ -7,7 +7,7 @@ import { get } from 'lodash-es';
 import { observer } from 'mobx-react';
 
 import { NotificationPolicy } from 'components/Policy/NotificationPolicy';
-import { SortableList } from 'components/SortableList/SortableList';
+import { SortableItem, SortableList } from 'components/SortableList/SortableList';
 import { Text } from 'components/Text/Text';
 import { Timeline } from 'components/Timeline/Timeline';
 import { WithPermissionControlTooltip } from 'containers/WithPermissionControl/WithPermissionControlTooltip';
@@ -109,7 +109,7 @@ export const PersonalNotificationSettings = observer((props: PersonalNotificatio
   };
 
   // Mobile app related NotificationPolicy props
-  const isMobileAppConnected = user.messaging_backends['MOBILE_APP']?.connected;
+  const isMobileAppConnected = Boolean(user.messaging_backends['MOBILE_APP']?.connected);
   const showCloudConnectionWarning =
     store.hasFeature(AppFeature.CloudConnection) && !store.cloudStore.cloudConnectionStatus.cloud_connection_status;
 
@@ -117,35 +117,31 @@ export const PersonalNotificationSettings = observer((props: PersonalNotificatio
     <div className={styles.root}>
       {title}
       <SortableList
-        helperClass={styles.sortableHelper}
         className={styles.steps}
-        axis="y"
-        lockAxis="y"
+        items={notificationPolicies.map((notificationPolicy: NotificationPolicyType) => notificationPolicy.id)}
         onSortEnd={getNotificationPolicySortEndHandler(offset)}
-        useDragHandle
       >
         {notificationPolicies.map((notificationPolicy: NotificationPolicyType, index: number) => (
-          <NotificationPolicy
-            // @ts-ignore
-            userAction={userAction}
-            key={notificationPolicy.id}
-            index={index}
-            number={index + 1}
-            telegramVerified={Boolean(user.telegram_configuration)}
-            phoneStatus={getPhoneStatus()}
-            isMobileAppConnected={isMobileAppConnected}
-            showCloudConnectionWarning={showCloudConnectionWarning}
-            slackTeamIdentity={store.organizationStore.currentOrganization?.slack_team_identity}
-            slackUserIdentity={user.slack_user_identity}
-            data={notificationPolicy}
-            onChange={getNotificationPolicyUpdateHandler}
-            onDelete={getNotificationPolicyDeleteHandler}
-            notificationChoices={get(userStore.notificationChoices, 'step.choices', [])}
-            waitDelays={get(userStore.notificationChoices, 'wait_delay.choices', [])}
-            notifyByOptions={userStore.notifyByOptions}
-            color={getColor(index)}
-            store={store}
-          />
+          <SortableItem key={notificationPolicy.id} id={notificationPolicy.id}>
+            <NotificationPolicy
+              userAction={userAction}
+              number={index + 1}
+              telegramVerified={Boolean(user.telegram_configuration)}
+              phoneStatus={getPhoneStatus()}
+              isMobileAppConnected={isMobileAppConnected}
+              showCloudConnectionWarning={showCloudConnectionWarning}
+              slackTeamIdentity={store.organizationStore.currentOrganization?.slack_team_identity}
+              slackUserIdentity={user.slack_user_identity}
+              data={notificationPolicy}
+              onChange={getNotificationPolicyUpdateHandler}
+              onDelete={getNotificationPolicyDeleteHandler}
+              notificationChoices={get(userStore.notificationChoices, 'step.choices', [])}
+              waitDelays={get(userStore.notificationChoices, 'wait_delay.choices', [])}
+              notifyByOptions={userStore.notifyByOptions}
+              color={getColor(index)}
+              store={store}
+            />
+          </SortableItem>
         ))}
         <Timeline.Item
           number={notificationPolicies.length + 1}
@@ -178,10 +174,6 @@ const getStyles = () => {
 
     steps: css`
       margin: 15px 0 0 15px;
-    `,
-
-    sortableHelper: css`
-      z-index: 1062;
     `,
   };
 };

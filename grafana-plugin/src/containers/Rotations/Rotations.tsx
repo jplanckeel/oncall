@@ -6,6 +6,7 @@ import { ValuePicker, Button, Tooltip, withTheme2, Stack } from '@grafana/ui';
 import dayjs from 'dayjs';
 import { HTML_ID } from 'helpers/DOM';
 import { UserActions } from 'helpers/authorization/authorization';
+import { NodeRefRegistry } from 'helpers/nodeRefs';
 import { observer } from 'mobx-react';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
 
@@ -50,6 +51,9 @@ interface RotationsState {
 
 @observer
 class _Rotations extends Component<RotationsProps, RotationsState> {
+  // react-transition-group needs an explicit nodeRef under React 19, one per <CSSTransition> key
+  nodeRefs = new NodeRefRegistry();
+
   state: RotationsState = {
     shiftStartToShowRotationForm: undefined,
     shiftEndToShowRotationForm: undefined,
@@ -172,12 +176,14 @@ class _Rotations extends Component<RotationsProps, RotationsState> {
                   />
                 )}
                 {layers.map((layer, layerIndex) => (
-                  <CSSTransition
+                  <CSSTransition<HTMLDivElement>
                     key={layerIndex}
+                    nodeRef={this.nodeRefs.get<HTMLDivElement>(`layer-${layerIndex}`)}
                     timeout={DEFAULT_TRANSITION_TIMEOUT}
                     classNames={{ ...getAnimationClasses() }}
                   >
                     <div
+                      ref={this.nodeRefs.get<HTMLDivElement>(`layer-${layerIndex}`)}
                       id={`layer${layer.priority}`}
                       className={cx(styles.layer, { [styles.layerFirst]: layerIndex === 0 })}
                     >
@@ -197,12 +203,16 @@ class _Rotations extends Component<RotationsProps, RotationsState> {
                           `}
                         >
                           {layer.shifts.map(({ shiftId, isPreview, events }, rotationIndex) => (
-                            <CSSTransition
+                            <CSSTransition<HTMLDivElement>
                               key={rotationIndex}
+                              nodeRef={this.nodeRefs.get<HTMLDivElement>(`rotation-${layerIndex}-${rotationIndex}`)}
                               timeout={DEFAULT_TRANSITION_TIMEOUT}
                               classNames={{ ...getAnimationClasses() }}
                             >
                               <Rotation
+                                forwardedRef={this.nodeRefs.get<HTMLDivElement>(
+                                  `rotation-${layerIndex}-${rotationIndex}`
+                                )}
                                 onClick={(shiftStart, shiftEnd) => {
                                   this.onRotationClick(shiftId, shiftStart, shiftEnd);
                                 }}

@@ -15,6 +15,10 @@ export interface TimelineItemProps {
   number?: number;
   badge?: number;
   children?: any;
+  /** Set by `SortableItem` so @dnd-kit can measure and move this row. */
+  innerRef?: React.Ref<HTMLElement>;
+  /** Drag transform applied by `SortableItem`. */
+  style?: React.CSSProperties;
 }
 
 export const TimelineItem: React.FC<TimelineItemProps> = ({
@@ -26,11 +30,13 @@ export const TimelineItem: React.FC<TimelineItemProps> = ({
   backgroundHexNumber,
   textColor = '#ffffff',
   number,
+  innerRef,
+  style,
 }) => {
   const styles = useStyles2(getTimelineStyles);
 
   return (
-    <li className={cx(styles.item, className)}>
+    <li ref={innerRef as React.Ref<HTMLLIElement>} style={style} className={cx(styles.item, className)}>
       {!isDisabled && (
         <div
           className={cx(styles.dot, backgroundClassName || '')}

@@ -34,6 +34,11 @@ interface RotationProps {
   showScheduleNameAsSlotTitle?: boolean;
   startDate?: dayjs.Dayjs;
   scheduleView?: ScheduleView;
+  /**
+   * Needed by react-transition-group's `nodeRef`: React 19 removed `ReactDOM.findDOMNode`,
+   * so <CSSTransition> can no longer discover this component's DOM node on its own.
+   */
+  forwardedRef?: React.Ref<HTMLDivElement>;
 }
 
 export const Rotation: FC<RotationProps> = observer((props) => {
@@ -58,6 +63,7 @@ export const Rotation: FC<RotationProps> = observer((props) => {
     showScheduleNameAsSlotTitle,
     startDate: propsStartDate,
     scheduleView: propsScheduleView,
+    forwardedRef,
   } = props;
 
   const scheduleView = propsScheduleView || storeScheduleView;
@@ -147,7 +153,7 @@ export const Rotation: FC<RotationProps> = observer((props) => {
   }, [events, startDate, selectedTimezoneOffset]);
 
   return (
-    <div className={styles.root} onClick={onClick && handleRotationClick}>
+    <div ref={forwardedRef} className={styles.root} onClick={onClick && handleRotationClick}>
       <div className={styles.timeline}>
         {events ? (
           events.length ? (
