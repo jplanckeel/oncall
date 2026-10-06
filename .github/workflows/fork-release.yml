@@ -1,0 +1,59 @@
+name: Fork release (unsigned plugin)
+
+# Builds the Grafana OnCall app plugin without signing it and attaches the zip to a GitHub release.
+# Load it in Grafana with: [plugins] allow_loading_unsigned_plugins = grafana-oncall-app
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release-plugin:
+    name: Build and release unsigned plugin
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Install frontend dependencies
+        uses: ./.github/actions/install-frontend-dependencies
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: grafana-plugin/go.mod
+          cache-dependency-path: grafana-plugin/go.sum
+
+      - name: Install Mage
+        run: go install github.com/magefile/mage@v1.15.0
+
+      - name: Determine plugin version
+        id: plugin-version
+        # the leading "v" must be chopped off: it tells the oncall plugin that this is an OSS build
+        run: echo version="${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and package plugin
+        working-directory: grafana-plugin
+        env:
+          PLUGIN_VERSION: ${{ steps.plugin-version.outputs.version }}
+        run: |
+          jq --arg v "$PLUGIN_VERSION" '.version=$v' package.json > package.new && mv package.new package.json
+          pnpm build
+          mage buildAll
+          mv dist grafana-oncall-app
+          zip -r "grafana-oncall-app-${PLUGIN_VERSION}.zip" ./grafana-oncall-app
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLUGIN_VERSION: ${{ steps.plugin-version.outputs.version }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "grafana-plugin/grafana-oncall-app-${PLUGIN_VERSION}.zip" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --prerelease
