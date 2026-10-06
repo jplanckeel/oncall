@@ -1,10 +1,26 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 
+import {
+  DndContext,
+  DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { cx } from '@emotion/css';
 import { Stack, IconButton, useStyles2 } from '@grafana/ui';
 import { arrayMoveImmutable } from 'array-move';
 import { UserActions } from 'helpers/authorization/authorization';
-import { SortableContainer, SortableElement, SortableHandle } from 'react-sortable-hoc';
 import { bem } from 'styles/utils.styles';
 
 import { Text } from 'components/Text/Text';
@@ -23,10 +39,6 @@ interface UserGroupsProps {
   showError?: boolean;
   disabled?: boolean;
 }
-
-const DragHandle = () => <IconButton aria-label="Drag" className={cx('icon')} name="draggabledots" />;
-
-const SortableHandleHoc = SortableHandle(DragHandle);
 
 export const UserGroups = (props: UserGroupsProps) => {
   const styles = useStyles2(getUserGroupStyles);
@@ -94,8 +106,8 @@ export const UserGroups = (props: UserGroupsProps) => {
     };
   };
 
-  const renderItem = (item: Item, index: number) => (
-    <li className={styles.user}>
+  const renderItem = (item: Item, index: number, dragHandle: React.ReactNode) => (
+    <>
       {renderUser(item.data)}
       {!disabled && (
         <div className={styles.userButtons}>
@@ -106,11 +118,11 @@ export const UserGroups = (props: UserGroupsProps) => {
               name="trash-alt"
               onClick={getDeleteItemHandler(index)}
             />
-            <SortableHandleHoc />
+            {dragHandle}
           </Stack>
         </div>
       )}
-    </li>
+    </>
   );
 
   return (
@@ -131,78 +143,154 @@ export const UserGroups = (props: UserGroupsProps) => {
         )}
         <SortableList
           renderItem={renderItem}
-          axis="y"
-          lockAxis="y"
-          helperClass={styles.sortable}
           items={items}
           onSortEnd={onSortEnd}
           handleAddGroup={handleAddUserGroup}
-          handleDeleteItem={handleDeleteUser}
           isMultipleGroups={isMultipleGroups}
-          useDragHandle
           allowCreate={!disabled}
+          isDragDisabled={disabled}
         />
       </Stack>
     </div>
   );
 };
 
-interface SortableItemProps {
-  children: React.ReactElement;
+interface SortableRowProps {
+  id: string;
+  className?: string;
+  isDragDisabled?: boolean;
+  children: (dragHandle: React.ReactNode) => React.ReactNode;
 }
 
-const SortableItem = SortableElement<SortableItemProps>(({ children }) => children);
+/**
+ * One draggable `<li>` of the group list. Replaces react-sortable-hoc's `SortableElement` + `SortableHandle`,
+ * which rely on `ReactDOM.findDOMNode` — removed in React 19, where they throw on mount.
+ *
+ * Only the returned handle starts a drag (react-sortable-hoc's `useDragHandle` behaviour), so the row stays
+ * clickable and the trash button keeps working.
+ */
+const SortableRow = ({ id, className, isDragDisabled, children }: SortableRowProps) => {
+  const styles = useStyles2(getUserGroupStyles);
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled: isDragDisabled,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    ...(isDragging ? { position: 'relative', zIndex: 1 } : {}),
+  };
+
+  const dragHandle = isDragDisabled ? null : (
+    <IconButton
+      aria-label="Drag"
+      className={cx('icon')}
+      name="draggabledots"
+      ref={setActivatorNodeRef}
+      {...attributes}
+      {...listeners}
+    />
+  );
+
+  return (
+    <li ref={setNodeRef} style={style} className={cx(className, { [styles.sortable]: isDragging })}>
+      {children(dragHandle)}
+    </li>
+  );
+};
 
 interface SortableListProps {
   items: Item[];
   handleAddGroup: () => void;
-  handleDeleteItem: (index: number) => void;
   isMultipleGroups: boolean;
-  renderItem: (item: Item, index: number) => React.ReactElement;
+  renderItem: (item: Item, index: number, dragHandle: React.ReactNode) => React.ReactNode;
+  onSortEnd: (params: { oldIndex: number; newIndex: number }) => void;
   allowCreate?: boolean;
+  isDragDisabled?: boolean;
 }
 
-export const SortableList = SortableContainer<SortableListProps>(
-  ({ items, handleAddGroup, isMultipleGroups, renderItem, allowCreate }) => {
-    const listRef = useRef<HTMLUListElement>();
-    const styles = useStyles2(getUserGroupStyles);
+const SortableList = ({
+  items,
+  handleAddGroup,
+  isMultipleGroups,
+  renderItem,
+  onSortEnd,
+  allowCreate,
+  isDragDisabled,
+}: SortableListProps) => {
+  const listRef = useRef<HTMLUListElement>();
+  const styles = useStyles2(getUserGroupStyles);
 
-    useEffect(() => {
-      const container = listRef.current;
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
-      container.scroll({
-        left: 0,
-        top: container.scrollHeight,
-        behavior: 'smooth',
-      });
-    }, [items]);
+  // group separators are sortable too — moving one moves the group boundary
+  const sortableIds = useMemo(
+    () => items.filter((item) => item.type === 'item' || isMultipleGroups).map((item) => item.key),
+    [items, isMultipleGroups]
+  );
 
-    return (
-      <ul className={styles.groups} ref={listRef}>
-        {items.map((item, index) =>
-          item.type === 'item' ? (
-            <SortableItem key={item.key} index={index}>
-              {renderItem(item, index)}
-            </SortableItem>
-          ) : isMultipleGroups ? (
-            <SortableItem key={item.key} index={index}>
-              <li className={styles.separator}>
-                <Text type="secondary">{item.data.name}</Text>
-              </li>
-            </SortableItem>
-          ) : null
-        )}
-        {allowCreate && isMultipleGroups && items[items.length - 1]?.type === 'item' && (
-          <SortableItem disabled key="New Group" index={items.length + 1}>
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    // indices must address the full plain array, which is what `fromPlainArray` rebuilds the groups from
+    const oldIndex = items.findIndex((item) => item.key === active.id);
+    const newIndex = items.findIndex((item) => item.key === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) {
+      return;
+    }
+
+    onSortEnd({ oldIndex, newIndex });
+  };
+
+  useEffect(() => {
+    const container = listRef.current;
+
+    container.scroll({
+      left: 0,
+      top: container.scrollHeight,
+      behavior: 'smooth',
+    });
+  }, [items]);
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+        <ul className={styles.groups} ref={listRef}>
+          {items.map((item, index) =>
+            item.type === 'item' ? (
+              <SortableRow key={item.key} id={item.key} className={styles.user} isDragDisabled={isDragDisabled}>
+                {(dragHandle) => renderItem(item, index, dragHandle)}
+              </SortableRow>
+            ) : isMultipleGroups ? (
+              <SortableRow key={item.key} id={item.key} className={styles.separator} isDragDisabled={isDragDisabled}>
+                {() => <Text type="secondary">{item.data.name}</Text>}
+              </SortableRow>
+            ) : null
+          )}
+          {allowCreate && isMultipleGroups && items[items.length - 1]?.type === 'item' && (
+            // not sortable: it is an action row, not a group
             <li
+              key="New Group"
               onClick={handleAddGroup}
               className={cx(styles.separator, { [bem(styles.separator, 'clickable')]: true })}
             >
               <Text type="primary">+ Add user group</Text>
             </li>
-          </SortableItem>
-        )}
-      </ul>
-    );
-  }
-);
+          )}
+        </ul>
+      </SortableContext>
+    </DndContext>
+  );
+};

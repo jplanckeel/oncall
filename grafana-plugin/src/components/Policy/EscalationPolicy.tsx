@@ -8,7 +8,6 @@ import { openWarningNotification } from 'helpers/helpers';
 import { isNumber } from 'lodash-es';
 import { observer } from 'mobx-react';
 import moment from 'moment-timezone';
-import { SortableElement } from 'react-sortable-hoc';
 import reactStringReplace from 'react-string-replace';
 import { getLabelBackgroundTextColorObject } from 'styles/utils.styles';
 
@@ -39,7 +38,9 @@ import { POLICY_DURATION_LIST_MINUTES } from './Policy.consts';
 import { PolicyNote } from './PolicyNote';
 
 interface ElementSortableProps extends WithStoreProps {
-  index: number;
+  /** Injected by `SortableItem`; both must land on the root `Timeline.Item` for @dnd-kit to drive the row. */
+  innerRef?: React.Ref<HTMLElement>;
+  style?: React.CSSProperties;
 }
 
 interface EscalationPolicyBaseProps {
@@ -66,7 +67,17 @@ class _EscalationPolicy extends React.Component<EscalationPolicyProps, any> {
   private styles: ReturnType<typeof getEscalationPolicyStyles>;
 
   render() {
-    const { data, escalationChoices, number, isDisabled, backgroundClassName, backgroundHexNumber, theme } = this.props;
+    const {
+      data,
+      escalationChoices,
+      number,
+      isDisabled,
+      backgroundClassName,
+      backgroundHexNumber,
+      theme,
+      innerRef,
+      style,
+    } = this.props;
     const { id, step, is_final } = data;
 
     const escalationOption = escalationChoices.find(
@@ -79,6 +90,8 @@ class _EscalationPolicy extends React.Component<EscalationPolicyProps, any> {
     return (
       <Timeline.Item
         key={id}
+        innerRef={innerRef}
+        style={style}
         contentClassName={styles.root}
         number={number}
         textColor={isDisabled ? itemTextColor : undefined}
@@ -627,5 +640,5 @@ class _EscalationPolicy extends React.Component<EscalationPolicyProps, any> {
 }
 
 export const EscalationPolicy = withMobXProviderContext(
-  SortableElement(withTheme2(_EscalationPolicy))
-) as unknown as React.ComponentClass<EscalationPolicyBaseProps>;
+  withTheme2(_EscalationPolicy)
+) as unknown as React.ComponentClass<EscalationPolicyBaseProps & Pick<ElementSortableProps, 'innerRef' | 'style'>>;

@@ -6,6 +6,7 @@ import { Badge, BadgeColor, Button, Icon, Stack, useStyles2, withTheme2 } from '
 import dayjs from 'dayjs';
 import { PLUGIN_ROOT, StackSize } from 'helpers/consts';
 import { useIsLoading } from 'helpers/hooks';
+import { useNodeRefRegistry } from 'helpers/nodeRefs';
 import { observer } from 'mobx-react';
 import { useNavigate } from 'react-router-dom-v5-compat';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
@@ -102,6 +103,8 @@ const _SchedulePersonal: FC<SchedulePersonalProps> = observer(({ userPk, onSlotC
   const emptyRotationsText = updatePersonalEventsLoading ? 'Loading ...' : 'There are no schedules relevant to user';
 
   const styles = useStyles2(getRotationsStyles);
+  // react-transition-group needs an explicit nodeRef under React 19, one per <CSSTransition> key
+  const nodeRefs = useNodeRefRegistry();
 
   return (
     <div className={styles.root}>
@@ -154,8 +157,14 @@ const _SchedulePersonal: FC<SchedulePersonalProps> = observer(({ userPk, onSlotC
           {shifts?.length ? (
             shifts.map(({ events }, index) => {
               return (
-                <CSSTransition key={index} timeout={DEFAULT_TRANSITION_TIMEOUT} classNames={{ ...animationStyles }}>
+                <CSSTransition<HTMLDivElement>
+                  key={index}
+                  nodeRef={nodeRefs.get<HTMLDivElement>(`shift-${index}`)}
+                  timeout={DEFAULT_TRANSITION_TIMEOUT}
+                  classNames={{ ...animationStyles }}
+                >
                   <Rotation
+                    forwardedRef={nodeRefs.get<HTMLDivElement>(`shift-${index}`)}
                     scheduleView={ScheduleView.OneWeek}
                     simplified
                     key={index}
@@ -169,8 +178,17 @@ const _SchedulePersonal: FC<SchedulePersonalProps> = observer(({ userPk, onSlotC
               );
             })
           ) : (
-            <CSSTransition key={0} timeout={DEFAULT_TRANSITION_TIMEOUT} classNames={{ ...animationStyles }}>
-              <Rotation events={[]} emptyText={emptyRotationsText} />
+            <CSSTransition<HTMLDivElement>
+              key={0}
+              nodeRef={nodeRefs.get<HTMLDivElement>('shift-empty')}
+              timeout={DEFAULT_TRANSITION_TIMEOUT}
+              classNames={{ ...animationStyles }}
+            >
+              <Rotation
+                forwardedRef={nodeRefs.get<HTMLDivElement>('shift-empty')}
+                events={[]}
+                emptyText={emptyRotationsText}
+              />
             </CSSTransition>
           )}
         </TransitionGroup>

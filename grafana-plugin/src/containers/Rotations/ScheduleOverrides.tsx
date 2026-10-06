@@ -6,6 +6,7 @@ import { Button, Stack, Tooltip, withTheme2 } from '@grafana/ui';
 import dayjs from 'dayjs';
 import { HTML_ID } from 'helpers/DOM';
 import { UserActions } from 'helpers/authorization/authorization';
+import { NodeRefRegistry } from 'helpers/nodeRefs';
 import { observer } from 'mobx-react';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
 
@@ -62,6 +63,9 @@ class _ScheduleOverrides extends Component<ScheduleOverridesProps, ScheduleOverr
     shiftStartToShowOverrideForm: undefined,
     shiftEndToShowOverrideForm: undefined,
   };
+
+  // react-transition-group needs an explicit nodeRef under React 19, one per <CSSTransition> key
+  nodeRefs = new NodeRefRegistry();
 
   render() {
     const {
@@ -150,8 +154,14 @@ class _ScheduleOverrides extends Component<ScheduleOverridesProps, ScheduleOverr
                   </Text>
                 </Tag>
                 {shiftSwaps.map(({ isPreview, events }, index) => (
-                  <CSSTransition key={index} timeout={DEFAULT_TRANSITION_TIMEOUT} classNames={{ ...animationStyles }}>
+                  <CSSTransition<HTMLDivElement>
+                    key={index}
+                    nodeRef={this.nodeRefs.get<HTMLDivElement>(`swap-${index}`)}
+                    timeout={DEFAULT_TRANSITION_TIMEOUT}
+                    classNames={{ ...animationStyles }}
+                  >
                     <Rotation
+                      forwardedRef={this.nodeRefs.get<HTMLDivElement>(`swap-${index}`)}
                       events={events}
                       color={SHIFT_SWAP_COLOR}
                       onSlotClick={(event) => {
@@ -169,8 +179,16 @@ class _ScheduleOverrides extends Component<ScheduleOverridesProps, ScheduleOverr
             ) : null}
             <TransitionGroup className={cx(styles.layer, { [styles.layerFirst]: !shiftSwaps || !shiftSwaps.length })}>
               {shifts && shifts.length ? (
-                <CSSTransition key={-1} timeout={DEFAULT_TRANSITION_TIMEOUT} classNames={{ ...animationStyles }}>
-                  <Tag className={styles.layerTitle}>
+                <CSSTransition<HTMLSpanElement>
+                  key={-1}
+                  nodeRef={this.nodeRefs.get<HTMLSpanElement>('overrides-title')}
+                  timeout={DEFAULT_TRANSITION_TIMEOUT}
+                  classNames={{ ...animationStyles }}
+                >
+                  <Tag
+                    forwardedRef={this.nodeRefs.get<HTMLSpanElement>('overrides-title')}
+                    className={styles.layerTitle}
+                  >
                     <Text type="primary" size="small">
                       Overrides
                     </Text>
@@ -179,8 +197,14 @@ class _ScheduleOverrides extends Component<ScheduleOverridesProps, ScheduleOverr
               ) : null}
               {shifts && shifts.length ? (
                 shifts.map(({ shiftId, isPreview, events }, index) => (
-                  <CSSTransition key={index} timeout={DEFAULT_TRANSITION_TIMEOUT} classNames={{ ...animationStyles }}>
+                  <CSSTransition<HTMLDivElement>
+                    key={index}
+                    nodeRef={this.nodeRefs.get<HTMLDivElement>(`override-${index}`)}
+                    timeout={DEFAULT_TRANSITION_TIMEOUT}
+                    classNames={{ ...animationStyles }}
+                  >
                     <Rotation
+                      forwardedRef={this.nodeRefs.get<HTMLDivElement>(`override-${index}`)}
                       events={events}
                       color={getOverrideColor(index)}
                       onClick={(shiftStart, shiftEnd) => {
@@ -192,8 +216,14 @@ class _ScheduleOverrides extends Component<ScheduleOverridesProps, ScheduleOverr
                   </CSSTransition>
                 ))
               ) : (
-                <CSSTransition key={0} timeout={DEFAULT_TRANSITION_TIMEOUT} classNames={{ ...animationStyles }}>
+                <CSSTransition<HTMLDivElement>
+                  key={0}
+                  nodeRef={this.nodeRefs.get<HTMLDivElement>('override-empty')}
+                  timeout={DEFAULT_TRANSITION_TIMEOUT}
+                  classNames={{ ...animationStyles }}
+                >
                   <Rotation
+                    forwardedRef={this.nodeRefs.get<HTMLDivElement>('override-empty')}
                     key={0}
                     events={[]}
                     onClick={(shiftStart, shiftEnd) => {

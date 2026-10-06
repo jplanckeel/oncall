@@ -12,7 +12,8 @@ interface TagProps {
   text?: string;
   children?: any;
   onClick?: (ev) => void;
-  forwardedRef?: React.MutableRefObject<HTMLSpanElement>;
+  // React.Ref (rather than MutableRefObject) so it can also receive a react-transition-group `nodeRef`
+  forwardedRef?: React.Ref<HTMLSpanElement>;
   size?: 'small' | 'medium';
 }
 
